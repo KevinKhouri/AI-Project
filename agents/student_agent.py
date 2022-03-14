@@ -42,6 +42,12 @@ class StudentAgent(Agent):
         # dummy return
         return my_pos, self.dir_map["u"]
 
+class SearchTree:
+    def __init__(self, root):
+        self.root = root
+
+    
+
 #Represents a node in the SearchTree that MCTS will construct.
 class Node:
     #Moves (Up, Right, Down, Left). Represents moving a position on the board.
@@ -111,6 +117,60 @@ class Node:
         self.childNodes = childrenNodes
         return
 
+    def isTerminal(self):
+        """
+        Check if the game ends and compute the current score of the agents.
+
+        Returns
+        -------
+        is_endgame : bool
+            Whether the game ends.
+        player_1_score : int
+            The score of player 1.
+        player_2_score : int
+            The score of player 2.
+        """
+        board_size = self.getBoardSize()
+
+         # Union-Find
+        father = dict()
+        for r in range(board_size):
+            for c in range(board_size):
+                father[(r, c)] = (r, c)
+
+        def find(pos):
+            if father[pos] != pos:
+                father[pos] = find(father[pos])
+            return father[pos]
+
+        def union(pos1, pos2):
+            father[pos1] = pos2
+
+        for r in range(board_size):
+            for c in range(board_size):
+                for dir, move in enumerate(
+                    Node.moves[1:3]
+                ):  # Only check down and right
+                    if self.chess_board[r, c, dir + 1]:
+                        continue
+                    pos_a = find((r, c))
+                    pos_b = find((r + move[0], c + move[1]))
+                    if pos_a != pos_b:
+                        union(pos_a, pos_b)
+
+        for r in range(board_size):
+            for c in range(board_size):
+                find((r, c))
+        p0_r = find(tuple(self.my_pos))
+        p1_r = find(tuple(self.adv_pos))
+        p0_score = list(father.values()).count(p0_r)
+        p1_score = list(father.values()).count(p1_r)
+        if p0_r == p1_r:
+            return False, p0_score, p1_score
+        return True, p0_score, p1_score
+
+#Node helper methods:
+
     #I'm assuming python passes chess_board by reference...?
     @staticmethod
     def set_barrier(chess_board, r, c, dir):
@@ -119,3 +179,8 @@ class Node:
         # Set the opposite barrier to True
         move = Node.moves[dir]
         chess_board[r + move[0], c + move[1], Node.opposites[dir]] = True
+
+    def getBoardSize(self):
+        return len(self.chess_board)
+
+  
