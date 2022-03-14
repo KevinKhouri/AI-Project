@@ -7,6 +7,7 @@ from agents.agent import Agent
 from store import register_agent
 import sys
 import math
+from agents.random_agent import RandomAgent
 
 
 @register_agent("student_agent")
@@ -58,6 +59,148 @@ class SearchTree:
             return node
         else:
             return SearchTree.selectHelper(max(node.childNodes, key=lambda x: x.UCB1))
+
+    #Simulates a full game starting from the state represented by 'node'.
+    #Returns the result 1 for win, 0 for loss. If a terminal state, simply returns
+    #the result.
+    @staticmethod
+    def simulate(node, max_step):
+        #If the node we want to simulate from is already representing a terminal state, 
+        #we simply return the result immediately.
+        gameOver, my_score, adv_score = node.isTerminal()
+        if (gameOver): 
+            if (my_score > adv_score):
+                return 1
+            else:
+                return 0
+        #Node was not a terminal state, so we must simulate a game from here:
+        chess_board_copy = deepcopy(node.chess_board)
+        starting_player_pos = deepcopy(node.my_pos) if node.my_turn else deepcopy(node.adv_pos)
+        secondary_player_pos =  deepcopy(node.adv_pos) if not node.my_turn else deepcopy(node.my_pos)
+        strt_player_score = 0
+        secd_player_score = 0
+        #Until we determine the simulated game is over, keep performing random walks
+        #for the start and secondary player until it's over.
+        while (not gameOver):
+            #Starting Player's Turn:
+            starting_player_pos, dir = (SearchTree.random_walk(chess_board_copy, 
+            starting_player_pos, secondary_player_pos, max_step))
+            r, c = starting_player_pos
+            Node.set_barrier(chess_board_copy, r, c, dir)
+            gameOver, strt_player_score, secd_player_score = SearchTree.isTerminalState(chess_board_copy, starting_player_pos, secondary_player_pos)
+            if (gameOver): break
+            #Secondary Player's Turn
+            secondary_player_pos, dir = (SearchTree.random_walk(chess_board_copy, 
+            secondary_player_pos, starting_player_pos, max_step))
+            r, c = secondary_player_pos
+            Node.set_barrier(chess_board_copy, r, c, dir)
+            gameOver, secd_player_score, strt_player_score = SearchTree.isTerminalState(chess_board_copy, starting_player_pos, secondary_player_pos)
+
+        #Map the score to the corresponding agent.
+        my_score = strt_player_score if node.my_turn else secd_player_score
+        adv_score = strt_player_score if not node.my_turn else secd_player_score
+
+        #Return the result of the simulation (win/loss)
+        #We consider a tie a loss.
+        if (my_score > adv_score):
+                return 1
+        else:
+                return 0
+
+    #Back propagated the result of a simulation starting from node, all the way 
+    #up the tree.
+    @staticmethod
+    def backPropagate(result, node):
+        pass
+
+    #Checks if the chess_board is in a terminal state, and returns the results of
+    #player at my_pos, and adv_pos respectively.
+    @staticmethod
+    def isTerminalState(chess_board, my_pos, adv_pos):
+        board_size = len(chess_board)
+
+         # Union-Find
+        father = dict()
+        for r in range(board_size):
+            for c in range(board_size):
+                father[(r, c)] = (r, c)
+
+        def find(pos):
+            if father[pos] != pos:
+                father[pos] = find(father[pos])
+            return father[pos]
+
+        def union(pos1, pos2):
+            father[pos1] = pos2
+
+        for r in range(board_size):
+            for c in range(board_size):
+                for dir, move in enumerate(
+                    Node.moves[1:3]
+                ):  # Only check down and right
+                    if chess_board[r, c, dir + 1]:
+                        continue
+                    pos_a = find((r, c))
+                    pos_b = find((r + move[0], c + move[1]))
+                    if pos_a != pos_b:
+                        union(pos_a, pos_b)
+
+        for r in range(board_size):
+            for c in range(board_size):
+                find((r, c))
+        p0_r = find(tuple(my_pos))
+        p1_r = find(tuple(adv_pos))
+        p0_score = list(father.values()).count(p0_r)
+        p1_score = list(father.values()).count(p1_r)
+        if p0_r == p1_r:
+            return False, p0_score, p1_score
+        return True, p0_score, p1_score
+            
+        
+    #Performs a random walk for my_pos on the chess_board.
+    @staticmethod
+    def random_walk(chess_board, my_pos, adv_pos, max_step):
+        """
+        Randomly walk to the next position in the board.
+
+        Parameters
+        ----------
+        my_pos : tuple
+            The position of the agent.
+        adv_pos : tuple
+            The position of the adversary.
+        """
+        ori_pos = deepcopy(my_pos)
+        steps = np.random.randint(0, max_step + 1)
+        # Random Walk
+        for _ in range(steps):
+            r, c = my_pos
+            dir = np.random.randint(0, 4)
+            m_r, m_c = Node.moves[dir]
+            my_pos = (r + m_r, c + m_c)
+
+            # Special Case enclosed by Adversary
+            k = 0
+            while chess_board[r, c, dir] or my_pos == adv_pos:
+                k += 1
+                if k > 300:
+                    break
+                dir = np.random.randint(0, 4)
+                m_r, m_c = Node.moves[dir]
+                my_pos = (r + m_r, c + m_c)
+
+            if k > 300:
+                my_pos = ori_pos
+                break
+
+        # Put Barrier
+        dir = np.random.randint(0, 4)
+        r, c = my_pos
+        while chess_board[r, c, dir]:
+            dir = np.random.randint(0, 4)
+
+        return my_pos, dir
+
 
 
 
