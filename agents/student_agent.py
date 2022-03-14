@@ -1,5 +1,8 @@
 # Student agent: Add your own agent here
 from logging import root
+import random
+from re import I
+import time
 import numpy as np
 from copy import deepcopy
 from queue import Empty
@@ -26,6 +29,8 @@ class StudentAgent(Agent):
             "d": 2,
             "l": 3,
         }
+        self.first_move = True
+        self.autoplay = True
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
         """
@@ -42,8 +47,28 @@ class StudentAgent(Agent):
 
         Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
         """
-        # dummy return
-        return my_pos, self.dir_map["u"]
+        if self.first_move:
+            self.first_move = False
+            return self.Monte_Carlo_Tree_Search(chess_board, my_pos, adv_pos, max_step, True)
+        else:
+            return self.Monte_Carlo_Tree_Search(chess_board, my_pos, adv_pos, max_step, False)
+
+    def Monte_Carlo_Tree_Search(self, chess_board, my_pos, adv_pos, max_step, first_move):
+        totalTime = 30 if first_move else 2 #Number of seconds we can think.
+        root = Node(chess_board, my_pos, adv_pos, True, None, None)
+        tree = SearchTree(root)
+        start_time = time.time()
+        while (time.time() - start_time < totalTime):
+            leaf = tree.select()
+            child = tree.expand(leaf)
+            result = tree.simulate(child, max_step)
+            tree.backPropagate(result, child)
+        #Time is up, so we must chose the child with the highest number of visits as the next move.
+        bestMove = max(root.childNodes, key=lambda x: x.totalPlays)
+        pos = bestMove.my_pos
+        dir = bestMove.wall_direction
+        return pos, dir
+
 
 #represents the SerachTree that consists of nodes from class Node, that MCTS will construct and traverse
 #each tree is initialized with a root node, then expanded/travsersed according to the UCT value of the children of the root
@@ -64,31 +89,19 @@ class SearchTree:
         if (node.childNodes == None):
             return node
         else:
-            return SearchTree.selectHelper(max(node.childNodes, key=lambda x: x.UCB1))
+            return SearchTree.selectHelper(max(node.childNodes, key=lambda x: x.UCB1()))
 
-    #Creates a list of child nodes that will be added to node
-    #each child node represents a legal next action to take from the current state
+    #Expands the selected leaf node. If its a terminal node or hasn't been played yet, it should be
+    #passed directly to simulation. Otherwise if its not a terminal node, and has been played before, this
+    #leaf should have its children generated.
     @staticmethod
-    def expand(node):
-        if((not node.isTerminal) or (node.totalPlays == 0)):
-            return
-        #node is terminal and has already been vistied, so it makes sense to expand
-        else: 
-            node.createChildrenNodes((node.getBoardSize()+1)/2) 
-
-             #set the MCTS statistics for the newly created children
-            #wins and totalPlays are already set to 0 by default (from the Node constructor)
-            for i in range (len(node.childNodes)):
-                node.childNodes[i].parentNode = node
-                #node.childNodes[i].wins = 0
-                #node.childNodes[i].totalPlays = 0
-
-            '''
-            if selection of one of the children for simulation should be handled by expand, uncomment what's below
-            return SearchTree.selectHelper(node)
-            '''
-            #dummy change
-            return 
+    def expand(leaf):
+        if (leaf.totalPlays == 0 or leaf.isTerminal()):
+            return leaf
+        else:
+            leaf.createChildrenNodes((leaf.getBoardSize()+1//2))
+            child = random.choice(leaf.childNodes)
+            return child
 
             
     #Simulates a full game starting from the state represented by 'node'.
@@ -139,7 +152,16 @@ class SearchTree:
     #up the tree.
     @staticmethod
     def backPropagate(result, node):
-        pass
+        temp = node
+    
+        while (temp.parentNode != None):
+            temp.totalPlays += 1
+            temp.wins += result
+            temp = temp.parentNode
+
+        temp.totalPlays += 1
+        temp.wins += result
+        return
 
     #Checks if the chess_board is in a terminal state, and returns the results of
     #player at my_pos, and adv_pos respectively.
@@ -230,11 +252,6 @@ class SearchTree:
         return my_pos, dir
 
 
-
-           
-
-    
-
 #Represents a node in the SearchTree that MCTS will construct.
 class Node:
     #Moves (Up, Right, Down, Left). Represents moving a position on the board.
@@ -249,7 +266,9 @@ class Node:
 
     #my_pos = my position, adv_pos = advesaries position. Position is tuple (row, column).
     #my_turn is boolean representing who's turn it is (our agent or theirs).
-    def __init__(self, chess_board, my_pos, adv_pos, my_turn, parentNode):
+    #Wall direction is the direction the wall is placed at my_pos if this node is the result of an action.
+    #Otherwise it's none.
+    def __init__(self, chess_board, my_pos, adv_pos, my_turn, parentNode, wall_direction):
         #defines a state
         self.chess_board = chess_board
         self.my_pos = my_pos
@@ -257,6 +276,7 @@ class Node:
         self.my_turn = my_turn
         self.terminal = None
         self.my_win = None
+        self.wall_direction = wall_direction
         #defines MCTS statistics and tree parameters
         self.wins = 0
         self.totalPlays = 0
@@ -287,9 +307,9 @@ class Node:
                     chess_board_copy = deepcopy(self.chess_board)
                     Node.set_barrier(chess_board_copy, row, column, dir)
                     if self.my_turn:
-                        childrenNodes.append(Node(chess_board_copy, cur_pos, self.adv_pos, False, self))
+                        childrenNodes.append(Node(chess_board_copy, cur_pos, self.adv_pos, False, self, dir))
                     else:
-                        childrenNodes.append(Node(chess_board_copy, self.my_pos, cur_pos, True, self))
+                        childrenNodes.append(Node(chess_board_copy, self.my_pos, cur_pos, True, self, None))
             
             #If the cur_step == max_step, the player can't move anywhere else from here, so don't add
             #anything to the queue and skip.
