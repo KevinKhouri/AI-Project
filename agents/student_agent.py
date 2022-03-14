@@ -54,10 +54,10 @@ class StudentAgent(Agent):
             return self.Monte_Carlo_Tree_Search(chess_board, my_pos, adv_pos, max_step, False)
 
     def Monte_Carlo_Tree_Search(self, chess_board, my_pos, adv_pos, max_step, first_move):
+        start_time = time.time()
         totalTime = 30 if first_move else 2 #Number of seconds we can think.
         root = Node(chess_board, my_pos, adv_pos, True, None, None)
         tree = SearchTree(root)
-        start_time = time.time()
         while (time.time() - start_time < totalTime):
             leaf = tree.select()
             child = tree.expand(leaf)
