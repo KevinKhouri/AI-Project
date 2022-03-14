@@ -61,18 +61,15 @@ class SearchTree:
             return SearchTree.selectHelper(max(node.childNodes, key=lambda x: x.UCB1))
 
     #Simulates a full game starting from the state represented by 'node'.
-    #Returns the result 1 for win, 0 for loss. If a terminal state, simply returns
+    #Returns the result 1 for win, 0 for loss. If node is already a terminal state, simply returns
     #the result.
     @staticmethod
     def simulate(node, max_step):
         #If the node we want to simulate from is already representing a terminal state, 
         #we simply return the result immediately.
-        gameOver, my_score, adv_score = node.isTerminal()
+        gameOver, result = node.isTerminal()
         if (gameOver): 
-            if (my_score > adv_score):
-                return 1
-            else:
-                return 0
+            return result
         #Node was not a terminal state, so we must simulate a game from here:
         chess_board_copy = deepcopy(node.chess_board)
         starting_player_pos = deepcopy(node.my_pos) if node.my_turn else deepcopy(node.adv_pos)
@@ -227,6 +224,8 @@ class Node:
         self.my_pos = my_pos
         self.adv_pos = adv_pos
         self.my_turn = my_turn
+        self.terminal = None
+        self.my_win = None
         #defines MCTS statistics and tree parameters
         self.wins = 0
         self.totalPlays = 0
@@ -276,7 +275,11 @@ class Node:
         self.childNodes = childrenNodes
         return
 
+    #Returns a boolean,int  representing if this node is a Terminal node (true/false) and if so, then if it's a win
+    #for our agent or a loss (1/0)
     def isTerminal(self):
+        if (self.terminal != None): #If we already computed if this node is a terminal
+            return self.terminal, self.my_win
         """
         Check if the game ends and compute the current score of the agents.
 
@@ -325,8 +328,15 @@ class Node:
         p0_score = list(father.values()).count(p0_r)
         p1_score = list(father.values()).count(p1_r)
         if p0_r == p1_r:
-            return False, p0_score, p1_score
-        return True, p0_score, p1_score
+            self.terminal = False
+            return False, 0
+        self.terminal = True
+        if (p0_score > p1_score):
+            self.my_win = 1
+            return True, 1
+        else:
+            self.my_win = 0
+            return True, 0
 
     #Should only be applied to nodes with parents. Does not make sense to compute
     #UCB1 value of a root node.
