@@ -44,6 +44,9 @@ class StudentAgent(Agent):
         # dummy return
         return my_pos, self.dir_map["u"]
 
+#represents the SerachTree that consists of nodes from class Node, that MCTS will construct and traverse
+#each tree is initialized with a root node, then expanded/travsersed according to the UCT value of the children of the root
+#methods that belong to SearchTree are select(), expand, simulate and backpropagate
 class SearchTree:
     def __init__(self, root):
         self.root = root
@@ -52,6 +55,9 @@ class SearchTree:
     def select(self):
         return SearchTree.selectHelper(self.root)
 
+   
+   #Given the current node, selectHelper will return the child node with the highest UCB1 value
+   #the Node retunred by this method will be the node with which the expand() method will be called
     @staticmethod
     def selectHelper(node):
         if (node.childNodes == None):
@@ -59,8 +65,29 @@ class SearchTree:
         else:
             return SearchTree.selectHelper(max(node.childNodes, key=lambda x: x.UCB1))
 
+    #Creates a list of child nodes that will be added to node
+    #each child node represents a legal next action to take from the current state
+    @staticmethod
+    def expand(node):
+        if((not node.isTerminal) or (node.totalPlays == 0)):
+            return
+        #node is terminal and has already been vistied, so it makes sense to expand
+        else: 
+            node.createChildrenNodes((node.getBoardSize()+1)/2) 
 
+            #set the MCTS statistics for the newly created children
+            #wins and totalPlays are already set to 0 by default (from the Node constructor)
+            for i in range (len(node.childNodes)):
+                node.childNodes[i].parentNode = node
+                #node.childNodes[i].wins = 0
+                #node.childNodes[i].totalPlays = 0
 
+            '''
+            if selection of one of the children for simulation should be handled by expand, uncomment what's below
+            return SearchTree.selectHelper(node)
+            '''
+
+            return 
 
     
 
