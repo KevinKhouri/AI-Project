@@ -1,10 +1,12 @@
 # Student agent: Add your own agent here
+from logging import root
 import numpy as np
 from copy import deepcopy
 from queue import Empty
 from agents.agent import Agent
 from store import register_agent
 import sys
+import math
 
 
 @register_agent("student_agent")
@@ -45,6 +47,20 @@ class StudentAgent(Agent):
 class SearchTree:
     def __init__(self, root):
         self.root = root
+
+    #Returns the leaf node selected based on the UCB1 value.
+    def select(self):
+        return SearchTree.selectHelper(self.root)
+
+    @staticmethod
+    def selectHelper(node):
+        if (node.childNodes == None):
+            return node
+        else:
+            return SearchTree.selectHelper(max(node.childNodes, key=lambda x: x.UCB1))
+
+
+
 
     
 
@@ -168,6 +184,17 @@ class Node:
         if p0_r == p1_r:
             return False, p0_score, p1_score
         return True, p0_score, p1_score
+
+    #Should only be applied to nodes with parents. Does not make sense to compute
+    #UCB1 value of a root node.
+    def UCB1(self):
+        if(self.totalPlays == 0):
+            return math.inf
+        else:
+            return (self.wins/self.totalPlays +
+             1.4142 * math.sqrt(math.log2(self.parentNode.totalPlays)/self.totalPlays))
+
+
 
 #Node helper methods:
 
