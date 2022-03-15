@@ -11,6 +11,7 @@ from store import register_agent
 import sys
 import math
 from agents.random_agent import RandomAgent
+import operator
 
 
 @register_agent("student_agent")
@@ -60,7 +61,7 @@ class StudentAgent(Agent):
         tree = SearchTree(root)
         while (time.time() - start_time < totalTime):
             leaf = tree.select()
-            child = tree.expand(leaf)
+            child = tree.expand(leaf) #I dont think this is expanding nodes properly.
             result = tree.simulate(child, max_step)
             tree.backPropagate(result, child)
         #Time is up, so we must chose the child with the highest number of visits as the next move.
@@ -96,7 +97,8 @@ class SearchTree:
     #leaf should have its children generated.
     @staticmethod
     def expand(leaf):
-        if (leaf.totalPlays == 0 or leaf.isTerminal()):
+        terminal, result = leaf.isTerminal()
+        if (leaf.totalPlays == 0 or terminal):
             return leaf
         else:
             leaf.createChildrenNodes((leaf.getBoardSize()+1//2))
@@ -318,7 +320,7 @@ class Node:
             #to the queue.
             if cur_step != max_step:
                 for dir in range(0,4):
-                    new_pos = cur_pos + Node.moves[dir]
+                    new_pos = tuple(map(operator.add, cur_pos, Node.moves[dir]))
                     if (not self.chess_board[row, column, dir] and tuple(new_pos) not in visited 
                             and not np.array_equal(new_pos, self.my_pos) and not np.array_equal(new_pos, self.adv_pos)):
                         state_queue.append((new_pos, cur_step + 1))
