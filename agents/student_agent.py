@@ -20,6 +20,7 @@ class StudentAgent(Agent):
     A dummy class for your implementation. Feel free to use this class to
     add any helper functionalities needed for your agent.
     """
+    searchTree = None #The search tree with the nodes.
 
     def __init__(self):
         super(StudentAgent, self).__init__()
@@ -48,27 +49,62 @@ class StudentAgent(Agent):
 
         Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
         """
+        #If this is the first move, we call Monte_Carlo_Tree_Search with a time limit of 30 seconds.
+        #Otherwise we call it with a time limit of 2 seconds. This would be the location where we could use
+        #threads to enforce the time limit.
         if self.first_move:
             self.first_move = False
-            return self.Monte_Carlo_Tree_Search(chess_board, my_pos, adv_pos, max_step, True)
+            #Since this is our first move, we must initialize the tree.
+            StudentAgent.searchTree = SearchTree(Node(chess_board, my_pos, adv_pos, True, None, None))
+            bestMove = self.Monte_Carlo_Tree_Search(max_step, True)
+            #Once we've received the result of the best move, we must change the SearchTree's root to the
+            #node that we will transition to.
+            StudentAgent.searchTree.root = bestMove
+            bestMove.parentNode = None #Here is where you'll use the garbage collector to see if it works.
+            #Unpack and return our move.
+            pos = bestMove.my_pos
+            dir = bestMove.wall_direction
+            return pos, dir
         else:
-            return self.Monte_Carlo_Tree_Search(chess_board, my_pos, adv_pos, max_step, False)
+            #Since this is not our first move, we must update our root node to the state that the advesary put us in.
+            foundChild = False
+            if StudentAgent.searchTree.root.childNodes != None:
+                for childNode in StudentAgent.searchTree.root.childNodes:
+                    if my_pos == childNode.my_pos and adv_pos == childNode.adv_pos and (chess_board==childNode.chess_board).all():
+                        StudentAgent.searchTree.root = childNode
+                        StudentAgent.searchTree.root.parentNode = None
+                        foundChild = True
+                        break
+                #If we did not find a Node representing the state we trantitioned to, we must create a new node for this state.
+            if (not foundChild):
+                StudentAgent.searchTree.root = Node(chess_board, my_pos, adv_pos, True, None, None) #Should check garbage collection here too.
+            #Run MCTS:
+            bestMove = self.Monte_Carlo_Tree_Search(max_step, False)
+            pos = bestMove.my_pos
+            dir = bestMove.wall_direction
+            return pos, dir
 
-    def Monte_Carlo_Tree_Search(self, chess_board, my_pos, adv_pos, max_step, first_move):
+    def Monte_Carlo_Tree_Search(self, max_step, first_move):
         start_time = time.time()
         totalTime = 30 if first_move else 2 #Number of seconds we can think.
-        root = Node(chess_board, my_pos, adv_pos, True, None, None)
-        tree = SearchTree(root)
         while (time.time() - start_time < totalTime):
-            leaf = tree.select()
-            child = tree.expand(leaf) #I dont think this is expanding nodes properly.
-            result = tree.simulate(child, max_step)
-            tree.backPropagate(result, child)
+            leaf = StudentAgent.searchTree.select()
+            child = StudentAgent.searchTree.expand(leaf) #I dont think this is expanding nodes properly.
+            #Generating all children is problamatic. A single node expansion will exceed the memory limits, so clearly when we expand a node and generate all 300 of its childre, that's
+            #too much(i think, we should test the memory usage).
+            result = StudentAgent.searchTree.simulate(child, max_step)
+            StudentAgent.searchTree.backPropagate(result, child)
         #Time is up, so we must chose the child with the highest number of visits as the next move.
-        bestMove = max(root.childNodes, key=lambda x: x.totalPlays)
-        pos = bestMove.my_pos
-        dir = bestMove.wall_direction
-        return pos, dir
+        return max(StudentAgent.searchTree.root.childNodes, key=lambda x: StudentAgent.nodeValue(x))
+        
+    @staticmethod
+    def nodeValue(child):
+        value = child.UCB1()
+        if value == math.inf: #When selecting the final action to take, we should ignore nodes that haven't been explored if we can.
+            return -math.inf
+        else:
+            return value
+
 
 
 #represents the SerachTree that consists of nodes from class Node, that MCTS will construct and traverse
@@ -119,7 +155,7 @@ class SearchTree:
         #Node was not a terminal state, so we must simulate a game from here:
         chess_board_copy = deepcopy(node.chess_board)
         starting_player_pos = deepcopy(node.my_pos) if node.my_turn else deepcopy(node.adv_pos)
-        secondary_player_pos =  deepcopy(node.adv_pos) if not node.my_turn else deepcopy(node.my_pos)
+        secondary_player_pos =  deepcopy(node.adv_pos) if node.my_turn else deepcopy(node.my_pos)
         strt_player_score = 0
         secd_player_score = 0
         #Until we determine the simulated game is over, keep performing random walks
@@ -208,7 +244,6 @@ class SearchTree:
             return False, p0_score, p1_score
         return True, p0_score, p1_score
             
-        
     #Performs a random walk for my_pos on the chess_board.
     @staticmethod
     def random_walk(chess_board, my_pos, adv_pos, max_step):
