@@ -20,8 +20,6 @@ class StudentAgent(Agent):
     A dummy class for your implementation. Feel free to use this class to
     add any helper functionalities needed for your agent.
     """
-    searchTree = None #The search tree with the nodes.
-
     def __init__(self):
         super(StudentAgent, self).__init__()
         self.name = "StudentAgent"
@@ -33,6 +31,7 @@ class StudentAgent(Agent):
         }
         self.first_move = True
         self.autoplay = True
+        searchTree = None #The search tree with the nodes.
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
         """
@@ -55,11 +54,11 @@ class StudentAgent(Agent):
         if self.first_move:
             self.first_move = False
             #Since this is our first move, we must initialize the tree.
-            StudentAgent.searchTree = SearchTree(Node(chess_board, my_pos, adv_pos, True, None, None))
+            self.searchTree = SearchTree(Node(chess_board, my_pos, adv_pos, True, None, None))
             bestMove = self.Monte_Carlo_Tree_Search(max_step, True)
             #Once we've received the result of the best move, we must change the SearchTree's root to the
             #node that we will transition to.
-            StudentAgent.searchTree.root = bestMove
+            self.searchTree.root = bestMove
             bestMove.parentNode = None #Here is where you'll use the garbage collector to see if it works.
             #Unpack and return our move.
             pos = bestMove.my_pos
@@ -68,16 +67,16 @@ class StudentAgent(Agent):
         else:
             #Since this is not our first move, we must update our root node to the state that the advesary put us in.
             foundChild = False
-            if StudentAgent.searchTree.root.childNodes != None:
-                for childNode in StudentAgent.searchTree.root.childNodes:
-                    if my_pos == childNode.my_pos and adv_pos == childNode.adv_pos and (chess_board==childNode.chess_board).all():
-                        StudentAgent.searchTree.root = childNode
-                        StudentAgent.searchTree.root.parentNode = None
+            if self.searchTree.root.childNodes != None:
+                for childNode in self.searchTree.root.childNodes:
+                    if my_pos == childNode.my_pos and adv_pos == childNode.adv_pos and np.array_equiv(chess_board, childNode.chess_board):
+                        self.searchTree.root = childNode
+                        self.searchTree.root.parentNode = None
                         foundChild = True
                         break
                 #If we did not find a Node representing the state we trantitioned to, we must create a new node for this state.
             if (not foundChild):
-                StudentAgent.searchTree.root = Node(chess_board, my_pos, adv_pos, True, None, None) #Should check garbage collection here too.
+                self.searchTree.root = Node(chess_board, my_pos, adv_pos, True, None, None) #Should check garbage collection here too.
             #Run MCTS:
             bestMove = self.Monte_Carlo_Tree_Search(max_step, False)
             pos = bestMove.my_pos
@@ -88,28 +87,28 @@ class StudentAgent(Agent):
         start_time = time.time()
         totalTime = 30 if first_move else 2 #Number of seconds we can think.
         while (time.time() - start_time < totalTime):
-            leaf = StudentAgent.searchTree.select()
-            child = StudentAgent.searchTree.expand(leaf) #I dont think this is expanding nodes properly.
-            #Generating all children is problamatic. A single node expansion will exceed the memory limits, so clearly when we expand a node and generate all 300 of its childre, that's
+            leaf = self.searchTree.select()
+            child = self.searchTree.expand(leaf) #I dont think this is expanding nodes properly.
+            #Generating all children is problamatic. A single node expansion will exceed the memory limits, so clearly when we expand a node and generate all 300 of its children, that's
             #too much(i think, we should test the memory usage).
-            result = StudentAgent.searchTree.simulate(child, max_step)
-            StudentAgent.searchTree.backPropagate(result, child)
+            result = self.searchTree.simulate(child, max_step)
+            self.searchTree.backPropagate(result, child)
         #Time is up, so we must chose the child with the highest number of visits as the next move.
-        return max(StudentAgent.searchTree.root.childNodes, key=lambda x: StudentAgent.nodeValue(x))
+        return max(self.searchTree.root.childNodes, key=lambda x: StudentAgent.nodeValue(x)) #We assume we'll always have a child node to choose. To be safe we could put an if statement here.
         
     @staticmethod
     def nodeValue(child):
         value = child.UCB1()
         if value == math.inf: #When selecting the final action to take, we should ignore nodes that haven't been explored if we can.
             return -math.inf
+        elif child.my_win == 1:
+            return math.inf
         else:
             return value
 
-
-
-#represents the SerachTree that consists of nodes from class Node, that MCTS will construct and traverse
-#each tree is initialized with a root node, then expanded/travsersed according to the UCT value of the children of the root
-#methods that belong to SearchTree are select(), expand, simulate and backpropagate
+#Represents the SerachTree that consists of nodes from class Node, that MCTS will construct and traverse.
+#Each tree is initialized with a root node, then expanded/travsersed according to the UCT value of the children of the root.
+#Methods that belong to SearchTree are select(), expand(), simulate() and backpropagate().
 class SearchTree:
     def __init__(self, root):
         self.root = root
@@ -120,10 +119,10 @@ class SearchTree:
 
    
    #Given the current node, selectHelper will return the child node with the highest UCB1 value
-   #the Node retunred by this method will be the node with which the expand() method will be called
+   #the Node returned by this method will be the node with which the expand() method will be called.
     @staticmethod
     def selectHelper(node):
-        if (node.childNodes == None):
+        if (node.unusedMoveSet == None or node.unusedMoveSet != []): #This is equivalent to isFullyExpanded == False. There is no boolean isFullyExpanded, its implied by this statement.
             return node
         else:
             return SearchTree.selectHelper(max(node.childNodes, key=lambda x: x.UCB1()))
@@ -134,11 +133,12 @@ class SearchTree:
     @staticmethod
     def expand(leaf):
         terminal, result = leaf.isTerminal()
-        if (leaf.totalPlays == 0 or terminal):
+        if (terminal or leaf.totalPlays == 0):
             return leaf
         else:
-            leaf.createChildrenNodes((leaf.getBoardSize()+1//2))
-            child = random.choice(leaf.childNodes)
+            child = leaf.createChildNode((leaf.getBoardSize()+1)//2) #To avoid generating all children immediately, this function should generate one child randomly and return it.
+            #We must thus also edit the selectHelper to consider nodes where isFullyExpanded == False as leaf nodes.
+            #If the expand function generates a child and finds that this leaf node has no more moves in its unusedMoveSet, it should set it to isFullyExpanded == True.
             return child
 
             
@@ -311,57 +311,64 @@ class Node:
         self.my_pos = my_pos
         self.adv_pos = adv_pos
         self.my_turn = my_turn
-        self.terminal = None
-        self.my_win = None
+        self.terminal = None #Boolean
+        self.my_win = None #Either 1 or 0
         self.wall_direction = wall_direction
         #defines MCTS statistics and tree parameters
         self.wins = 0
         self.totalPlays = 0
         self.parentNode = parentNode
-        self.childNodes = None
+        self.childNodes = [] #CHECK ANYWHERE WE USED THE ASSUMPTION THIS WAS INITIALLY NONE
+        self.unusedMoveSet = None
 
-    #This function generates all child nodes. Uses BFS up to depth max_step to find all legal states
-    #we can transition to from this state, creates a node for each state, stores them in an array, 
-    #and sets this node's childNodes array to equal the array created.
-    def createChildrenNodes(self, max_step):
+    #This function generates all available moves if they haven't already been created. Uses BFS up to depth max_step to find all legal states
+    #we can transition to from this state, stores the legal move (pos, dir) in an array. 
+    #Will then generate a child by randomly selected an unusedLegalMove, and return that child.
+    def createChildNode(self, max_step):
         #Supposedly arrays are faster than lists, but is there an arraylist like thing in python?
-        childrenNodes = []
+        if (self.unusedMoveSet == None):
+            self.unusedMoveSet = []
 
-        start_pos = self.my_pos if self.my_turn else self.adv_pos
+            start_pos = self.my_pos if self.my_turn else self.adv_pos
 
-        #The second element in the tuples is the count of steps needed to get to that position. Performs BFS.
-        state_queue = [(start_pos, 0)]
-        visited = {tuple(start_pos)}
+            #The second element in the tuples is the count of steps needed to get to that position. Performs BFS.
+            state_queue = [(start_pos, 0)]
+            visited = {tuple(start_pos)}
 
-        while state_queue:
-            cur_pos, cur_step = state_queue.pop(0)
-            row, column = cur_pos
-            #Find where the player could place a barrier in the current position, and create a node for 
-            #each successful spot.
-            #dir = direction. A value in chess_board at row,column,dir is true if that spot has a barrier.
-            for dir in range(0,4):
-                if not self.chess_board[row, column, dir]:
-                    chess_board_copy = deepcopy(self.chess_board)
-                    Node.set_barrier(chess_board_copy, row, column, dir)
-                    if self.my_turn:
-                        childrenNodes.append(Node(chess_board_copy, cur_pos, self.adv_pos, False, self, dir))
-                    else:
-                        childrenNodes.append(Node(chess_board_copy, self.my_pos, cur_pos, True, self, None))
-            
-            #If the cur_step == max_step, the player can't move anywhere else from here, so don't add
-            #anything to the queue and skip.
-            #Else, find each nonvisted neighboring position the player could visit (not blocked by barrier
-            #or by opposing agent), add its position and corresponding number of steps needed to get there 
-            #to the queue.
-            if cur_step != max_step:
+            while state_queue:
+                cur_pos, cur_step = state_queue.pop(0)
+                row, column = cur_pos
+                #Find where the player could place a barrier in the current position, and create a node for 
+                #each successful spot.
+                #dir = direction. A value in chess_board at row,column,dir is true if that spot has a barrier.
                 for dir in range(0,4):
-                    new_pos = tuple(map(operator.add, cur_pos, Node.moves[dir]))
-                    if (not self.chess_board[row, column, dir] and tuple(new_pos) not in visited 
-                            and not np.array_equal(new_pos, self.my_pos) and not np.array_equal(new_pos, self.adv_pos)):
-                        state_queue.append((new_pos, cur_step + 1))
-
-        self.childNodes = childrenNodes
-        return
+                    if not self.chess_board[row, column, dir]:
+                        self.unusedMoveSet.append((cur_pos, dir))
+                #If the cur_step == max_step, the player can't move anywhere else from here, so don't add
+                #anything to the queue and skip.
+                #Else, find each nonvisted neighboring position the player could visit (not blocked by barrier
+                #or by opposing agent), add its position and corresponding number of steps needed to get there 
+                #to the queue.
+                if cur_step != max_step:
+                    for dir in range(0,4):
+                        new_pos = tuple(map(operator.add, cur_pos, Node.moves[dir]))
+                        if (not self.chess_board[row, column, dir] and tuple(new_pos) not in visited 
+                                and not np.array_equal(new_pos, self.my_pos) and not np.array_equal(new_pos, self.adv_pos)):
+                            state_queue.append((new_pos, cur_step + 1))
+        #The unused available moves has either just been created or has already been created.
+        #So now we select one at random, generate a child for it, and return that child.
+        newpos, newdir = self.unusedMoveSet.pop(random.randrange(len(self.unusedMoveSet)))
+        chess_board_copy = deepcopy(self.chess_board)
+        r, c = newpos
+        Node.set_barrier(chess_board_copy, r, c, newdir)
+        if self.my_turn:
+            newnode = Node(chess_board_copy, newpos, self.adv_pos, False, self, newdir)
+            self.childNodes.append(newnode)
+            return newnode
+        else:
+            newnode = Node(chess_board_copy, self.my_pos, newpos, True, self, None)
+            self.childNodes.append(newnode)
+            return newnode
 
     #Returns a boolean,int  representing if this node is a Terminal node (true/false) and if so, then if it's a win
     #for our agent or a loss (1/0)
