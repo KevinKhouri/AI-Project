@@ -330,10 +330,11 @@ class Node:
 
             #The second element in the tuples is the count of steps needed to get to that position. Performs BFS.
             state_queue = [(start_pos, 0)]
-            visited = {tuple(start_pos)}
+            visited = set()
 
             while state_queue:
                 cur_pos, cur_step = state_queue.pop(0)
+                visited.add(cur_pos)
                 row, column = cur_pos
                 #Find where the player could place a barrier in the current position, and create a node for 
                 #each successful spot.
@@ -468,7 +469,7 @@ class MoveSet:
         #self.tuples = set()
         #self.tuples = []
 
-    def append(self, tuple):
+    def append(self, tuple): #((r, c), d)
         pos, d = tuple
         r , c = pos
         self.tuples.append(r)
