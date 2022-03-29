@@ -86,13 +86,16 @@ class StudentAgent(Agent):
 
     def Monte_Carlo_Tree_Search(self, max_step, first_move):
         start_time = time.time()
-        totalTime = 30 if first_move else 2 #Number of seconds we can think.
+        totalTime = 29.99 if first_move else 1.99 #Number of seconds we can think.
+        numOfSimulations = 0 #REMOVE THIS
         while (time.time() - start_time < totalTime):
             leaf = self.searchTree.select()
             child = self.searchTree.expand(leaf)
             result = self.searchTree.simulate(child, max_step)
             self.searchTree.backPropagate(result, child)
+            numOfSimulations += 1 #REMOVE THIS
         #Time is up, so we must chose the child with the highest number of visits as the next move.
+        print("Total time this turn: " + str((time.time() - start_time)) + " Simulations: " + str(numOfSimulations)) #REMOVE THIS
         return max(self.searchTree.root.childNodes, key=lambda x: StudentAgent.nodeValue(x)) #We assume we'll always have a child node to choose. To be safe we could put an if statement here.
         
     @staticmethod
@@ -465,6 +468,8 @@ class Node:
 class MoveSet:
     def __init__(self):
         self.tuples = array("b")
+        #self.tuples = set()
+        #self.tuples = []
 
     def append(self, tuple):
         pos, d = tuple
@@ -472,6 +477,8 @@ class MoveSet:
         self.tuples.append(r)
         self.tuples.append(c)
         self.tuples.append(d)
+        #self.tuples.add(tuple)
+        #self.tuples.append(tuple)
 
     def popRandomMove(self):
         size = len(self.tuples)//3
@@ -479,7 +486,9 @@ class MoveSet:
         r = self.tuples.pop(randomIndex)
         c = self.tuples.pop(randomIndex)
         d = self.tuples.pop(randomIndex)
-        return (r, c), d
+        return (r, c), d 
+        #return self.tuples.pop()
+        #return self.tuples.pop(random.randrange(len(self.tuples)))
 
 
     def isEmpty(self):
