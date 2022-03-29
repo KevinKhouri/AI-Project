@@ -88,9 +88,7 @@ class StudentAgent(Agent):
         totalTime = 30 if first_move else 2 #Number of seconds we can think.
         while (time.time() - start_time < totalTime):
             leaf = self.searchTree.select()
-            child = self.searchTree.expand(leaf) #I dont think this is expanding nodes properly.
-            #Generating all children is problamatic. A single node expansion will exceed the memory limits, so clearly when we expand a node and generate all 300 of its children, that's
-            #too much(i think, we should test the memory usage).
+            child = self.searchTree.expand(leaf)
             result = self.searchTree.simulate(child, max_step)
             self.searchTree.backPropagate(result, child)
         #Time is up, so we must chose the child with the highest number of visits as the next move.
@@ -136,9 +134,7 @@ class SearchTree:
         if (terminal or leaf.totalPlays == 0):
             return leaf
         else:
-            child = leaf.createChildNode((leaf.getBoardSize()+1)//2) #To avoid generating all children immediately, this function should generate one child randomly and return it.
-            #We must thus also edit the selectHelper to consider nodes where isFullyExpanded == False as leaf nodes.
-            #If the expand function generates a child and finds that this leaf node has no more moves in its unusedMoveSet, it should set it to isFullyExpanded == True.
+            child = leaf.createChildNode((leaf.getBoardSize()+1)//2)  #Generates a child node based on a random move within the max_step limits.
             return child
 
             
@@ -318,8 +314,8 @@ class Node:
         self.wins = 0
         self.totalPlays = 0
         self.parentNode = parentNode
-        self.childNodes = [] #CHECK ANYWHERE WE USED THE ASSUMPTION THIS WAS INITIALLY NONE
-        self.unusedMoveSet = None
+        self.childNodes = [] #This...
+        self.unusedMoveSet = None #And this could possibly be replaced by a numpy array.
 
     #This function generates all available moves if they haven't already been created. Uses BFS up to depth max_step to find all legal states
     #we can transition to from this state, stores the legal move (pos, dir) in an array. 
