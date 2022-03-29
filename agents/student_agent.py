@@ -1,4 +1,5 @@
 # Student agent: Add your own agent here
+from array import array
 from logging import root
 import random
 from re import I
@@ -31,7 +32,7 @@ class StudentAgent(Agent):
         }
         self.first_move = True
         self.autoplay = True
-        searchTree = None #The search tree with the nodes.
+        self.searchTree = None #The search tree with the nodes.
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
         """
@@ -120,7 +121,7 @@ class SearchTree:
    #the Node returned by this method will be the node with which the expand() method will be called.
     @staticmethod
     def selectHelper(node):
-        if (node.unusedMoveSet == None or node.unusedMoveSet != []): #This is equivalent to isFullyExpanded == False. There is no boolean isFullyExpanded, its implied by this statement.
+        if (node.unusedMoveSet == None or not node.unusedMoveSet.isEmpty()): #This is equivalent to isFullyExpanded == False. There is no boolean isFullyExpanded, its implied by this statement.
             return node
         else:
             return SearchTree.selectHelper(max(node.childNodes, key=lambda x: x.UCB1()))
@@ -323,7 +324,7 @@ class Node:
     def createChildNode(self, max_step):
         #Supposedly arrays are faster than lists, but is there an arraylist like thing in python?
         if (self.unusedMoveSet == None):
-            self.unusedMoveSet = []
+            self.unusedMoveSet = MoveSet()
 
             start_pos = self.my_pos if self.my_turn else self.adv_pos
 
@@ -353,7 +354,7 @@ class Node:
                             state_queue.append((new_pos, cur_step + 1))
         #The unused available moves has either just been created or has already been created.
         #So now we select one at random, generate a child for it, and return that child.
-        newpos, newdir = self.unusedMoveSet.pop(random.randrange(len(self.unusedMoveSet)))
+        newpos, newdir = self.unusedMoveSet.popRandomMove()
         chess_board_copy = deepcopy(self.chess_board)
         r, c = newpos
         Node.set_barrier(chess_board_copy, r, c, newdir)
@@ -454,4 +455,32 @@ class Node:
     def getBoardSize(self):
         return len(self.chess_board)
 
-  
+#ToDo: Implement a class to represent a set of moves using a single python array of integers as the underlying data structure.
+#Every three elements in the array represents a move.
+#Functions needed to be implemented must behave the same as their use above with lists such as in createChildNode.
+#isEmpty() to replace node.unusedMoveSet != []
+#constructor to replace line 326
+#create function to replace self.unusedMoveSet.append((cur_pos, dir)) with same parameters.
+#replace newpos, newdir = self.unusedMoveSet.pop(random.randrange(len(self.unusedMoveSet))) with .size() and .pop() function with same parameters and return type.
+class MoveSet:
+    def __init__(self):
+        self.tuples = array("b")
+
+    def append(self, tuple):
+        pos, d = tuple
+        r , c = pos
+        self.tuples.append(r)
+        self.tuples.append(c)
+        self.tuples.append(d)
+
+    def popRandomMove(self):
+        size = len(self.tuples)//3
+        randomIndex = random.randrange(size)*3
+        r = self.tuples.pop(randomIndex)
+        c = self.tuples.pop(randomIndex)
+        d = self.tuples.pop(randomIndex)
+        return (r, c), d
+
+
+    def isEmpty(self):
+        return (len(self.tuples) == 0)
