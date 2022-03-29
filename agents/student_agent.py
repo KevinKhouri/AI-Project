@@ -6,12 +6,9 @@ from re import I
 import time
 import numpy as np
 from copy import deepcopy
-from queue import Empty
 from agents.agent import Agent
 from store import register_agent
-import sys
 import math
-from agents.random_agent import RandomAgent
 import operator
 
 
@@ -135,7 +132,7 @@ class SearchTree:
     @staticmethod
     def expand(leaf):
         terminal, result = leaf.isTerminal()
-        if (terminal or leaf.totalPlays == 0):
+        if (terminal or leaf.totalPlays < 2):
             return leaf
         else:
             child = leaf.createChildNode((leaf.getBoardSize()+1)//2)  #Generates a child node based on a random move within the max_step limits.
@@ -465,8 +462,8 @@ class Node:
 #constructor to replace line 326
 #create function to replace self.unusedMoveSet.append((cur_pos, dir)) with same parameters.
 #replace newpos, newdir = self.unusedMoveSet.pop(random.randrange(len(self.unusedMoveSet))) with .size() and .pop() function with same parameters and return type.
-class MoveSet:
-    def __init__(self):
+class MoveSet: 
+    def __init__(self): 
         self.tuples = array("b")
         #self.tuples = set()
         #self.tuples = []
@@ -492,4 +489,5 @@ class MoveSet:
 
 
     def isEmpty(self):
-        return (len(self.tuples) == 0)
+        i = len(self.tuples)
+        return (i == 0)
