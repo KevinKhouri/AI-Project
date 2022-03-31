@@ -87,7 +87,7 @@ class StudentAgent(Agent):
         numOfSimulations = 0 #REMOVE THIS
         while (time.time() - start_time < totalTime):
             leaf = self.searchTree.select()
-            child = self.searchTree.expand(leaf)
+            child = self.searchTree.expand(leaf, max_step)
             result = self.searchTree.simulate(child, max_step)
             self.searchTree.backPropagate(result, child)
             numOfSimulations += 1 #REMOVE THIS
@@ -130,12 +130,12 @@ class SearchTree:
     #passed directly to simulation. Otherwise if its not a terminal node, and has been played before, this
     #leaf should have its children generated.
     @staticmethod
-    def expand(leaf):
+    def expand(leaf, max_step):
         terminal, result = leaf.isTerminal()
-        if (terminal or leaf.totalPlays < 2):
+        if (terminal or leaf.totalPlays == 0):
             return leaf
         else:
-            child = leaf.createChildNode((leaf.getBoardSize()+1)//2)  #Generates a child node based on a random move within the max_step limits.
+            child = leaf.createChildNode(max_step)  #Generates a child node based on a random move within the max_step limits.
             return child
 
             
@@ -324,17 +324,15 @@ class Node:
     def createChildNode(self, max_step):
         #Supposedly arrays are faster than lists, but is there an arraylist like thing in python?
         if (self.unusedMoveSet == None):
-            self.unusedMoveSet = MoveSet()
+            self.unusedMoveSet = MoveSet(self.getBoardSize())
 
             start_pos = self.my_pos if self.my_turn else self.adv_pos
 
             #The second element in the tuples is the count of steps needed to get to that position. Performs BFS.
             state_queue = [(start_pos, 0)]
-            visited = set()
-
+            visited = {tuple(start_pos)}
             while state_queue:
                 cur_pos, cur_step = state_queue.pop(0)
-                visited.add(cur_pos)
                 row, column = cur_pos
                 #Find where the player could place a barrier in the current position, and create a node for 
                 #each successful spot.
@@ -352,6 +350,7 @@ class Node:
                         new_pos = tuple(map(operator.add, cur_pos, Node.moves[dir]))
                         if (not self.chess_board[row, column, dir] and tuple(new_pos) not in visited 
                                 and not np.array_equal(new_pos, self.my_pos) and not np.array_equal(new_pos, self.adv_pos)):
+                            visited.add(tuple(new_pos))    
                             state_queue.append((new_pos, cur_step + 1))
         #The unused available moves has either just been created or has already been created.
         #So now we select one at random, generate a child for it, and return that child.
@@ -464,31 +463,109 @@ class Node:
 #create function to replace self.unusedMoveSet.append((cur_pos, dir)) with same parameters.
 #replace newpos, newdir = self.unusedMoveSet.pop(random.randrange(len(self.unusedMoveSet))) with .size() and .pop() function with same parameters and return type.
 class MoveSet: 
-    def __init__(self): 
-        self.tuples = array("b")
+    def __init__(self, board_size): 
+        #Version 1
+        #self.tuples = array("b")
+        #self.elementsAdded = 0
+        #self.elementsRemoved = 0
+
+        #Version 2
         #self.tuples = set()
+
+        #Version 3
         #self.tuples = []
 
+        #Version 4 (Numpy Attempt)
+        if (board_size == 4):
+            self.tuples = np.empty(108, dtype=np.int8)
+        elif (board_size == 5):
+            self.tuples = np.empty(216, dtype=np.int8)
+        elif (board_size == 6):
+            self.tuples = np.empty(252, dtype=np.int8)
+        elif (board_size == 7):
+            self.tuples = np.empty(408, dtype=np.int8)
+        elif (board_size == 8):
+            self.tuples = np.empty(444, dtype=np.int8)
+        elif (board_size == 9):
+            self.tuples = np.empty(648, dtype=np.int8)
+        elif (board_size == 10):
+            self.tuples = np.empty(684, dtype=np.int8)
+        elif (board_size == 11):
+            self.tuples = np.empty(936, dtype=np.int8)
+        elif (board_size == 12):
+            self.tuples = np.empty(972, dtype=np.int8)
+        else:
+            raise Exception("The Board Size is larger than 12! This isn't allowed!")
+
+        self.elementsAdded = 0
+        self.elementsRemoved = 0
+
     def append(self, tuple): #((r, c), d)
-        pos, d = tuple
-        r , c = pos
-        self.tuples.append(r)
-        self.tuples.append(c)
-        self.tuples.append(d)
+        #Version 1
+        #pos, d = tuple
+        #r , c = pos
+        #self.tuples.append(r)
+        #self.tuples.append(c)
+        #self.tuples.append(d)
+        #self.elementsAdded += 1
+
+        #Version 2
         #self.tuples.add(tuple)
+
+        #Version 3
         #self.tuples.append(tuple)
 
+        #Version 4
+        pos, d = tuple
+        r , c = pos
+        startIndex = self.elementsAdded*3
+        self.tuples[startIndex] = r
+        self.tuples[startIndex+1] = c
+        self.tuples[startIndex+2] = d
+        self.elementsAdded += 1
+
+
     def popRandomMove(self):
-        size = len(self.tuples)//3
-        randomIndex = random.randrange(size)*3
-        r = self.tuples.pop(randomIndex)
-        c = self.tuples.pop(randomIndex)
-        d = self.tuples.pop(randomIndex)
-        return (r, c), d 
+        #Version 1
+        #maxIndex = self.elementsAdded*3 - 1
+        #randomIndex = random.randrange(self.elementsAdded)*3
+        #while (self.tuples[randomIndex] == -1):
+        #    if (randomIndex == maxIndex):
+        #        randomIndex = 0
+        #    else:
+        #        randomIndex += 1
+        #r = self.tuples[randomIndex]
+        #self.tuples[randomIndex] = -1
+        #c = self.tuples[randomIndex + 1]
+        #self.tuples[randomIndex + 1] = -1
+        #d = self.tuples[randomIndex + 2]
+        #self.tuples[randomIndex + 2] = -1
+        #self.elementsRemoved += 1
+        #return (r, c), d 
+
+        #Version 2
         #return self.tuples.pop()
+
+        #Version 3
         #return self.tuples.pop(random.randrange(len(self.tuples)))
 
+        #Version 4
+        maxIndex = self.elementsAdded*3 - 1
+        randomIndex = random.randrange(self.elementsAdded)*3
+        while (self.tuples[randomIndex] == -1):
+            randomIndex += 3
+            if (randomIndex >= maxIndex):
+                randomIndex = 0
+            
+        r = self.tuples[randomIndex]
+        self.tuples[randomIndex] = -1
+        c = self.tuples[randomIndex + 1]
+        self.tuples[randomIndex + 1] = -1
+        d = self.tuples[randomIndex + 2]
+        self.tuples[randomIndex + 2] = -1
+        self.elementsRemoved += 1
+        return (r, c), d 
 
     def isEmpty(self):
-        i = len(self.tuples)
+        i = self.elementsAdded - self.elementsRemoved
         return (i == 0)
