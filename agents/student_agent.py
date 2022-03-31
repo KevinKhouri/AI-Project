@@ -61,7 +61,7 @@ class StudentAgent(Agent):
             #Unpack and return our move.
             pos = bestMove.my_pos
             dir = bestMove.wall_direction
-            return pos, dir
+            return pos, int(dir)
         else:
             #Since this is not our first move, we must update our root node to the state that the advesary put us in.
             foundChild = False
@@ -79,7 +79,7 @@ class StudentAgent(Agent):
             bestMove = self.Monte_Carlo_Tree_Search(max_step, False)
             pos = bestMove.my_pos
             dir = bestMove.wall_direction
-            return pos, dir
+            return pos, int(dir)
 
     def Monte_Carlo_Tree_Search(self, max_step, first_move):
         start_time = time.time()
