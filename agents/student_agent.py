@@ -298,7 +298,6 @@ class Node:
     #Down (2), Left (3)
     opposites = {0: 2, 1: 3, 2: 0, 3: 1}
 
-    board_size = None
     #my_pos = my position, adv_pos = advesaries position. Position is tuple (row, column).
     #my_turn is boolean representing who's turn it is (our agent or theirs).
     #Wall direction is the direction the wall is placed at my_pos if this node is the result of an action.
@@ -454,9 +453,7 @@ class Node:
         chess_board[r + move[0], c + move[1], Node.opposites[dir]] = True
 
     def getBoardSize(self):
-        if (Node.board_size == None):
-            Node.board_size = len(self.chess_board)
-        return Node.board_size
+        return len(self.chess_board)
 
 #ToDo: Implement a class to represent a set of moves using a single python array of integers as the underlying data structure.
 #Every three elements in the array represents a move.
