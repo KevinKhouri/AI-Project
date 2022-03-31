@@ -11,7 +11,7 @@ from store import register_agent
 import math
 import operator
 
-
+#Thor's Hammer Jonathan
 @register_agent("student_agent")
 class StudentAgent(Agent):
     """
@@ -92,7 +92,7 @@ class StudentAgent(Agent):
             self.searchTree.backPropagate(result, child)
             numOfSimulations += 1 #REMOVE THIS
         #Time is up, so we must chose the child with the highest number of visits as the next move.
-        print("Total time this turn: " + str((time.time() - start_time)) + " Simulations: " + str(numOfSimulations)) #REMOVE THIS
+        print(" B: Total time this turn: " + str((time.time() - start_time)) + " Simulations: " + str(numOfSimulations)) #REMOVE THIS
         return max(self.searchTree.root.childNodes, key=lambda x: StudentAgent.nodeValue(x)) #We assume we'll always have a child node to choose. To be safe we could put an if statement here.
         
     @staticmethod
@@ -157,7 +157,10 @@ class SearchTree:
         secd_player_score = 0
         #Until we determine the simulated game is over, keep performing random walks
         #for the start and secondary player until it's over.
-        while (not gameOver):
+        #The above comment was the old implementation. The new implementation will perform a max of 
+        #5 moves for each player (10 ply). Then using the evaluation function determine the winner. 
+        movesLeft = 5
+        while (not gameOver and movesLeft > 0):
             #Starting Player's Turn:
             starting_player_pos, dir = (SearchTree.random_walk(chess_board_copy, 
             starting_player_pos, secondary_player_pos, max_step))
@@ -171,10 +174,18 @@ class SearchTree:
             r, c = secondary_player_pos
             Node.set_barrier(chess_board_copy, r, c, dir)
             gameOver, secd_player_score, strt_player_score = SearchTree.isTerminalState(chess_board_copy, starting_player_pos, secondary_player_pos)
+            movesLeft -= 1
 
-        #Map the score to the corresponding agent.
-        my_score = strt_player_score if node.my_turn else secd_player_score
-        adv_score = strt_player_score if not node.my_turn else secd_player_score
+        #Map the score to the corresponding agent if the game ended, otherwise use the evaluation function
+        # to determine the score.
+        if (gameOver):
+            my_score = strt_player_score if node.my_turn else secd_player_score
+            adv_score = strt_player_score if not node.my_turn else secd_player_score
+        else:
+            if (node.my_turn):
+                return SearchTree.evaluationFunction(chess_board_copy, starting_player_pos, secondary_player_pos, max_step)
+            else:
+                return SearchTree.evaluationFunction(chess_board_copy, secondary_player_pos, starting_player_pos, max_step)
 
         #Return the result of the simulation (win/loss)
         #We consider a tie a loss.
@@ -182,6 +193,49 @@ class SearchTree:
                 return 1
         else:
                 return 0
+
+    #The evaluation function for a game that has not completed to termination.
+    #It computes the number of possible positions that both agents can reach. Then
+    #it considers the agent that could move the most number of squares as the winner.
+    #A possible different eval function could consider the number of possible moves the
+    #agents could make (i.e. consider the wall placements they could make too).
+    @staticmethod
+    def evaluationFunction(chess_board, my_pos, adv_pos, max_step):
+        my_score = SearchTree.evaluationFunctionHelper(chess_board, my_pos, adv_pos, max_step)
+        adv_score =  SearchTree.evaluationFunctionHelper(chess_board, adv_pos, my_pos, max_step)
+        if (my_score > adv_score):
+            return 1
+        else:
+            return 0
+
+    #Computes the number of places that a single agent can move to (the agent who's position is
+    #passed in as my_pos).
+    @staticmethod
+    def evaluationFunctionHelper(chess_board, my_pos, adv_pos, max_step):
+        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+
+        start_pos = my_pos
+        numberOfPlacesReached = 0
+        #The second element in the tuples is the count of steps needed to get to that position. Performs BFS.
+        state_queue = [(start_pos, 0)]
+        visited = {tuple(start_pos)}
+        while state_queue:
+            cur_pos, cur_step = state_queue.pop(0)
+            row, column = cur_pos
+            numberOfPlacesReached += 1
+            #If the cur_step == max_step, the player can't move anywhere else from here, so don't add
+            #anything to the queue and skip.
+            #Else, find each nonvisted neighboring position the player could visit (not blocked by barrier
+            #or by opposing agent), add its position and corresponding number of steps needed to get there 
+            #to the queue.
+            if cur_step != max_step:
+                for dir in range(0,4):
+                    new_pos = tuple(map(operator.add, cur_pos, moves[dir]))
+                    if (not chess_board[row, column, dir] and tuple(new_pos) not in visited 
+                            and not np.array_equal(new_pos, my_pos) and not np.array_equal(new_pos, adv_pos)):
+                        visited.add(tuple(new_pos))    
+                        state_queue.append((new_pos, cur_step + 1))
+        return numberOfPlacesReached
 
     #Back propagated the result of a simulation starting from node, all the way 
     #up the tree.
