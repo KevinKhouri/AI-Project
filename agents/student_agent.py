@@ -83,7 +83,7 @@ class StudentAgent(Agent):
 
     def Monte_Carlo_Tree_Search(self, max_step, first_move):
         start_time = time.time()
-        totalTime = 29.99 if first_move else 1.99 #Number of seconds we can think.
+        totalTime = 14.99 if first_move else 1.99 #Number of seconds we can think.
         numOfSimulations = 0 #REMOVE THIS
         while (time.time() - start_time < totalTime):
             leaf = self.searchTree.select()
@@ -158,34 +158,36 @@ class SearchTree:
         #Until we determine the simulated game is over, keep performing random walks
         #for the start and secondary player until it's over.
         #The above comment was the old implementation. The new implementation will perform a max of 
-        #5 moves for each player (10 ply). Then using the evaluation function determine the winner. 
-        movesLeft = 5
-        while (not gameOver and movesLeft > 0):
+        #4 moves for each player (8 ply). Then using the evaluation function determine the winner. 
+        movesLeft = 4 #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        while (not gameOver and movesLeft > 0): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
             #Starting Player's Turn:
             starting_player_pos, dir = (SearchTree.random_walk(chess_board_copy, 
             starting_player_pos, secondary_player_pos, max_step))
             r, c = starting_player_pos
             Node.set_barrier(chess_board_copy, r, c, dir)
-            gameOver, strt_player_score, secd_player_score = SearchTree.isTerminalState(chess_board_copy, starting_player_pos, secondary_player_pos)
-            if (gameOver): break
+            if (node.my_turn): #i.e. Our agent is the starting_player. Thus we want to check if a game is over every time we move.
+                gameOver, strt_player_score, secd_player_score = SearchTree.isTerminalState(chess_board_copy, starting_player_pos, secondary_player_pos)
+                if (gameOver): break
             #Secondary Player's Turn
             secondary_player_pos, dir = (SearchTree.random_walk(chess_board_copy, 
             secondary_player_pos, starting_player_pos, max_step))
             r, c = secondary_player_pos
             Node.set_barrier(chess_board_copy, r, c, dir)
-            gameOver, secd_player_score, strt_player_score = SearchTree.isTerminalState(chess_board_copy, starting_player_pos, secondary_player_pos)
-            movesLeft -= 1
+            if (not node.my_turn): #i.e. our agent is the secondary_player. Thus we want to check if a game is over every time we move.
+                gameOver, secd_player_score, strt_player_score = SearchTree.isTerminalState(chess_board_copy, starting_player_pos, secondary_player_pos)
+            movesLeft -= 1 #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
 
         #Map the score to the corresponding agent if the game ended, otherwise use the evaluation function
         # to determine the score.
-        if (gameOver):
-            my_score = strt_player_score if node.my_turn else secd_player_score
-            adv_score = strt_player_score if not node.my_turn else secd_player_score
-        else:
-            if (node.my_turn):
-                return SearchTree.evaluationFunction(chess_board_copy, starting_player_pos, secondary_player_pos, max_step)
-            else:
-                return SearchTree.evaluationFunction(chess_board_copy, secondary_player_pos, starting_player_pos, max_step)
+        if (gameOver): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+            my_score = strt_player_score if node.my_turn else secd_player_score # FOR EARLY PLAYOUT TERMINATION INDENT THIS BACK IN
+            adv_score = strt_player_score if not node.my_turn else secd_player_score #FOR EARLY PLAYOUT TERMINATION INDENT THIS BACK IN
+        else: #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+            if (node.my_turn): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+                return SearchTree.evaluationFunction(chess_board_copy, starting_player_pos, secondary_player_pos, max_step) #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+            else: #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+                return SearchTree.evaluationFunction(chess_board_copy, secondary_player_pos, starting_player_pos, max_step) #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
 
         #Return the result of the simulation (win/loss)
         #We consider a tie a loss.
@@ -331,9 +333,11 @@ class SearchTree:
                 my_pos = ori_pos
                 break
 
+        r, c = my_pos
+        if (chess_board[r,c,0] and chess_board[r,c,1] and chess_board[r,c,2] and chess_board[r,c,3]):
+            return my_pos, 0
         # Put Barrier
         dir = np.random.randint(0, 4)
-        r, c = my_pos
         while chess_board[r, c, dir]:
             dir = np.random.randint(0, 4)
 
