@@ -159,8 +159,8 @@ class SearchTree:
         #for the start and secondary player until it's over.
         #The above comment was the old implementation. The new implementation will perform a max of 
         #4 moves for each player (8 ply). Then using the evaluation function determine the winner. 
-        movesLeft = 4 #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-        while (not gameOver and movesLeft > 0): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        #movesLeft = 6 #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        while (not gameOver):# and movesLeft > 0): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
             #Starting Player's Turn:
             starting_player_pos, dir = (SearchTree.random_walk(chess_board_copy, 
             starting_player_pos, secondary_player_pos, max_step))
@@ -176,25 +176,28 @@ class SearchTree:
             Node.set_barrier(chess_board_copy, r, c, dir)
             if (not node.my_turn): #i.e. our agent is the secondary_player. Thus we want to check if a game is over every time we move.
                 gameOver, secd_player_score, strt_player_score = SearchTree.isTerminalState(chess_board_copy, starting_player_pos, secondary_player_pos)
-            movesLeft -= 1 #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+            #movesLeft -= 1 #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
 
         #Map the score to the corresponding agent if the game ended, otherwise use the evaluation function
         # to determine the score.
-        if (gameOver): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-            my_score = strt_player_score if node.my_turn else secd_player_score # FOR EARLY PLAYOUT TERMINATION INDENT THIS BACK IN
-            adv_score = strt_player_score if not node.my_turn else secd_player_score #FOR EARLY PLAYOUT TERMINATION INDENT THIS BACK IN
-        else: #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-            if (node.my_turn): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-                return SearchTree.evaluationFunction(chess_board_copy, starting_player_pos, secondary_player_pos, max_step) #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-            else: #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-                return SearchTree.evaluationFunction(chess_board_copy, secondary_player_pos, starting_player_pos, max_step) #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        #if (gameOver): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        my_score = strt_player_score if node.my_turn else secd_player_score # FOR EARLY PLAYOUT TERMINATION INDENT THIS BACK IN
+        adv_score = strt_player_score if not node.my_turn else secd_player_score #FOR EARLY PLAYOUT TERMINATION INDENT THIS BACK IN
+        #else: #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        #    if (node.my_turn): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        #        return SearchTree.evaluationFunction(chess_board_copy, starting_player_pos, secondary_player_pos, max_step) #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        #    else: #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        #        return SearchTree.evaluationFunction(chess_board_copy, secondary_player_pos, starting_player_pos, max_step) #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
 
         #Return the result of the simulation (win/loss)
         #We consider a tie a loss.
         if (my_score > adv_score):
-                return 1
+            return 1
+        elif (my_score < adv_score):
+            return 0
         else:
-                return 0
+            return 0.5
+
 
     #The evaluation function for a game that has not completed to termination.
     #It computes the number of possible positions that both agents can reach. Then
@@ -203,12 +206,15 @@ class SearchTree:
     #agents could make (i.e. consider the wall placements they could make too).
     @staticmethod
     def evaluationFunction(chess_board, my_pos, adv_pos, max_step):
+        board_size = len(chess_board)
+        numOfTiles = board_size * board_size
         my_score = SearchTree.evaluationFunctionHelper(chess_board, my_pos, adv_pos, max_step)
         adv_score =  SearchTree.evaluationFunctionHelper(chess_board, adv_pos, my_pos, max_step)
-        if (my_score > adv_score):
-            return 1
-        else:
-            return 0
+        return ( my_score/adv_score - (1/(numOfTiles - 1)) )/( (numOfTiles - 1) - (1/(numOfTiles - 1)) )
+        #if (my_score > adv_score): #Commented out to allow for returning the ratio above.
+        #    return 1
+        #else:
+        #    return 0
 
     #Computes the number of places that a single agent can move to (the agent who's position is
     #passed in as my_pos).
