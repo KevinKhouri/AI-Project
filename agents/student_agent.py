@@ -80,16 +80,13 @@ class StudentAgent(Agent):
 
     def Monte_Carlo_Tree_Search(self, max_step, first_move):
         start_time = time.time()
-        totalTime = 14.99 if first_move else 1.99 #Number of seconds we can think.
-        numOfSimulations = 0 #REMOVE THIS
+        totalTime = 29.99 if first_move else 1.99 #Number of seconds we can think.
         while (time.time() - start_time < totalTime):
             leaf = self.searchTree.select()
             child = self.searchTree.expand(leaf, max_step)
             result = self.searchTree.simulate(child, max_step)
             self.searchTree.backPropagate(result, child)
-            numOfSimulations += 1 #REMOVE THIS
         #Time is up, so we must chose the child with the highest number of visits as the next move.
-        print(" B: Total time this turn: " + str((time.time() - start_time)) + " Simulations: " + str(numOfSimulations)) #REMOVE THIS
         return max(self.searchTree.root.childNodes, key=lambda x: StudentAgent.nodeValue(x)) #We assume we'll always have a child node to choose. To be safe we could put an if statement here.
         
     @staticmethod
@@ -156,8 +153,8 @@ class SearchTree:
         #for the start and secondary player until it's over.
         #The above comment was the old implementation. The new implementation will perform a max of 
         #4 moves for each player (8 ply). Then using the evaluation function determine the winner. 
-        movesLeft = 7 #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-        while (not gameOver and movesLeft > 0): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        
+        while (not gameOver):
             #Starting Player's Turn:
             starting_player_pos, dir = (SearchTree.random_walk(chess_board_copy, 
             starting_player_pos, secondary_player_pos, max_step))
@@ -173,18 +170,11 @@ class SearchTree:
             Node.set_barrier(chess_board_copy, r, c, dir)
             if (node.my_turn): #i.e. our agent is not the secondary_player. Thus we want to check if a game is over every time the advesary moves.
                 gameOver, strt_player_score, secd_player_score = SearchTree.isTerminalState(chess_board_copy, starting_player_pos, secondary_player_pos)
-            movesLeft -= 1 #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
 
         #Map the score to the corresponding agent if the game ended, otherwise use the evaluation function
         # to determine the score.
-        if (gameOver): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-            my_score = strt_player_score if node.my_turn else secd_player_score # FOR EARLY PLAYOUT TERMINATION INDENT THIS BACK IN
-            adv_score = strt_player_score if not node.my_turn else secd_player_score #FOR EARLY PLAYOUT TERMINATION INDENT THIS BACK IN
-        else: #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-            if (node.my_turn): #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-                return SearchTree.evaluationFunction(chess_board_copy, starting_player_pos, secondary_player_pos, max_step) #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-            else: #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
-                return SearchTree.evaluationFunction(chess_board_copy, secondary_player_pos, starting_player_pos, max_step) #FOR EARLY PLAYOUT TERMINATION COMMENT THIS BACK IN
+        my_score = strt_player_score if node.my_turn else secd_player_score 
+        adv_score = strt_player_score if not node.my_turn else secd_player_score 
 
         #Return the result of the simulation (win/loss)
         #We consider a tie a loss.
@@ -192,51 +182,6 @@ class SearchTree:
             return 1
         else:
             return 0
-     #The evaluation function for a game that has not completed to termination.
-    #It computes the number of possible positions that both agents can reach. Then
-    #it considers the agent that could move the most number of squares as the winner.
-    #A possible different eval function could consider the number of possible moves the
-    #agents could make (i.e. consider the wall placements they could make too).
-    @staticmethod
-    def evaluationFunction(chess_board, my_pos, adv_pos, max_step):
-        board_size = len(chess_board)
-        numOfTiles = board_size * board_size
-        my_score = SearchTree.evaluationFunctionHelper(chess_board, my_pos, adv_pos, max_step)
-        adv_score =  SearchTree.evaluationFunctionHelper(chess_board, adv_pos, my_pos, max_step)
-        return ( my_score/adv_score - (1/(numOfTiles - 1)) )/( (numOfTiles - 1) - (1/(numOfTiles - 1)) )
-        #if (my_score > adv_score): #Commented out to allow for returning the ratio above.
-        #    return 1
-        #else:
-        #    return 0
-
-    #Computes the number of places that a single agent can move to (the agent who's position is
-    #passed in as my_pos).
-    @staticmethod
-    def evaluationFunctionHelper(chess_board, my_pos, adv_pos, max_step):
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
-
-        start_pos = my_pos
-        numberOfPlacesReached = 0
-        #The second element in the tuples is the count of steps needed to get to that position. Performs BFS.
-        state_queue = [(start_pos, 0)]
-        visited = {tuple(start_pos)}
-        while state_queue:
-            cur_pos, cur_step = state_queue.pop(0)
-            row, column = cur_pos
-            numberOfPlacesReached += 1
-            #If the cur_step == max_step, the player can't move anywhere else from here, so don't add
-            #anything to the queue and skip.
-            #Else, find each nonvisted neighboring position the player could visit (not blocked by barrier
-            #or by opposing agent), add its position and corresponding number of steps needed to get there 
-            #to the queue.
-            if cur_step != max_step:
-                for dir in range(0,4):
-                    new_pos = tuple(map(operator.add, cur_pos, moves[dir]))
-                    if (not chess_board[row, column, dir] and tuple(new_pos) not in visited 
-                            and not np.array_equal(new_pos, my_pos) and not np.array_equal(new_pos, adv_pos)):
-                        visited.add(tuple(new_pos))    
-                        state_queue.append((new_pos, cur_step + 1))
-        return numberOfPlacesReached
 
     #Back propagated the result of a simulation starting from node, all the way 
     #up the tree.
@@ -257,44 +202,43 @@ class SearchTree:
     #player at my_pos, and adv_pos respectively.
     @staticmethod
     def isTerminalState(chess_board, my_pos, adv_pos):
-        board_size = len(chess_board)
+        my_state_queue = [tuple(my_pos)]
+        my_visited = {tuple(my_pos)}
+        my_score = 1
 
-         # Union-Find
-        father = dict()
-        for r in range(board_size):
-            for c in range(board_size):
-                father[(r, c)] = (r, c)
+        adv_state_queue = [tuple(adv_pos)]
+        adv_visited = {tuple(adv_pos)}
+        adv_score = 1
 
-        def find(pos):
-            if father[pos] != pos:
-                father[pos] = find(father[pos])
-            return father[pos]
+        while (my_state_queue or adv_state_queue):
+            if (my_state_queue):
+                #Make a BFS step for my agent.
+                my_cur_pos = my_state_queue.pop(0)
+                my_row, my_col = my_cur_pos
 
-        def union(pos1, pos2):
-            father[pos1] = pos2
+                for dir in range(0,4):
+                    my_new_pos = tuple(map(operator.add, my_cur_pos, Node.moves[dir]))
+                    if (not chess_board[my_row, my_col, dir] and tuple(my_new_pos) in adv_visited):
+                        return False, 0, 0
+                    elif (not chess_board[my_row, my_col, dir] and tuple(my_new_pos) not in my_visited):
+                        my_visited.add(tuple(my_new_pos))
+                        my_state_queue.append(tuple(my_new_pos))
+                        my_score += 1
+            if (adv_state_queue):
+                #Make a BFS step for adv agent.
+                adv_cur_pos = adv_state_queue.pop(0)
+                adv_row, adv_col = adv_cur_pos
 
-        for r in range(board_size):
-            for c in range(board_size):
-                for dir, move in enumerate(
-                    Node.moves[1:3]
-                ):  # Only check down and right
-                    if chess_board[r, c, dir + 1]:
-                        continue
-                    pos_a = find((r, c))
-                    pos_b = find((r + move[0], c + move[1]))
-                    if pos_a != pos_b:
-                        union(pos_a, pos_b)
-
-        for r in range(board_size):
-            for c in range(board_size):
-                find((r, c))
-        p0_r = find(tuple(my_pos))
-        p1_r = find(tuple(adv_pos))
-        p0_score = list(father.values()).count(p0_r)
-        p1_score = list(father.values()).count(p1_r)
-        if p0_r == p1_r:
-            return False, p0_score, p1_score
-        return True, p0_score, p1_score
+                for dir in range(0,4):
+                    adv_new_pos = tuple(map(operator.add, adv_cur_pos, Node.moves[dir]))
+                    if (not chess_board[adv_row, adv_col, dir] and tuple(adv_new_pos) in my_visited):
+                        return False, 0, 0
+                    elif (not chess_board[adv_row, adv_col, dir] and tuple(adv_new_pos) not in adv_visited):
+                        adv_visited.add(tuple(adv_new_pos))
+                        adv_state_queue.append(tuple(adv_new_pos))
+                        adv_score += 1
+        #Game is over, return scores:
+        return True, my_score, adv_score
             
     #Performs a random walk for my_pos on the chess_board.
     @staticmethod
@@ -433,58 +377,46 @@ class Node:
     def isTerminal(self):
         if (self.terminal != None): #If we already computed if this node is a terminal
             return self.terminal, self.my_win
-        """
-        Check if the game ends and compute the current score of the agents.
+        my_state_queue = [tuple(self.my_pos)]
+        my_visited = {tuple(self.my_pos)}
+        my_score = 1
 
-        Returns
-        -------
-        is_endgame : bool
-            Whether the game ends.
-        player_1_score : int
-            The score of player 1.
-        player_2_score : int
-            The score of player 2.
-        """
-        board_size = self.getBoardSize()
+        adv_state_queue = [tuple(self.adv_pos)]
+        adv_visited = {tuple(self.adv_pos)}
+        adv_score = 1
 
-         # Union-Find
-        father = dict()
-        for r in range(board_size):
-            for c in range(board_size):
-                father[(r, c)] = (r, c)
+        while (my_state_queue or adv_state_queue):
+            if (my_state_queue):
+                #Make a BFS step for my agent.
+                my_cur_pos = my_state_queue.pop(0)
+                my_row, my_col = my_cur_pos
 
-        def find(pos):
-            if father[pos] != pos:
-                father[pos] = find(father[pos])
-            return father[pos]
+                for dir in range(0,4):
+                    my_new_pos = tuple(map(operator.add, my_cur_pos, Node.moves[dir]))
+                    if (not self.chess_board[my_row, my_col, dir] and tuple(my_new_pos) in adv_visited):
+                        self.terminal = False
+                        return False, 0
+                    elif (not self.chess_board[my_row, my_col, dir] and tuple(my_new_pos) not in my_visited):
+                        my_visited.add(tuple(my_new_pos))
+                        my_state_queue.append(tuple(my_new_pos))
+                        my_score += 1
+            if (adv_state_queue):
+                #Make a BFS step for adv agent.
+                adv_cur_pos = adv_state_queue.pop(0)
+                adv_row, adv_col = adv_cur_pos
 
-        def union(pos1, pos2):
-            father[pos1] = pos2
-
-        for r in range(board_size):
-            for c in range(board_size):
-                for dir, move in enumerate(
-                    Node.moves[1:3]
-                ):  # Only check down and right
-                    if self.chess_board[r, c, dir + 1]:
-                        continue
-                    pos_a = find((r, c))
-                    pos_b = find((r + move[0], c + move[1]))
-                    if pos_a != pos_b:
-                        union(pos_a, pos_b)
-
-        for r in range(board_size):
-            for c in range(board_size):
-                find((r, c))
-        p0_r = find(tuple(self.my_pos))
-        p1_r = find(tuple(self.adv_pos))
-        p0_score = list(father.values()).count(p0_r)
-        p1_score = list(father.values()).count(p1_r)
-        if p0_r == p1_r:
-            self.terminal = False
-            return False, 0
+                for dir in range(0,4):
+                    adv_new_pos = tuple(map(operator.add, adv_cur_pos, Node.moves[dir]))
+                    if (not self.chess_board[adv_row, adv_col, dir] and tuple(adv_new_pos) in my_visited):
+                        self.terminal = False
+                        return False, 0
+                    elif (not self.chess_board[adv_row, adv_col, dir] and tuple(adv_new_pos) not in adv_visited):
+                        adv_visited.add(tuple(adv_new_pos))
+                        adv_state_queue.append(tuple(adv_new_pos))
+                        adv_score += 1
+        #Game is over, return scores:
         self.terminal = True
-        if (p0_score > p1_score):
+        if (my_score > adv_score):
             self.my_win = 1
             return True, 1
         else:
