@@ -80,7 +80,7 @@ class StudentAgent(Agent):
 
     def Monte_Carlo_Tree_Search(self, max_step, first_move):
         start_time = time.time()
-        totalTime = 29.99 if first_move else 1.99 #Number of seconds we can think.
+        totalTime = 29.98 if first_move else 1.98 #Number of seconds we can think.
         while (time.time() - start_time < totalTime):
             leaf = self.searchTree.select()
             child = self.searchTree.expand(leaf, max_step)
